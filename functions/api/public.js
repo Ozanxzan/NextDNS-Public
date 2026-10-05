@@ -3,6 +3,11 @@
  *
  * Returns aggregated analytics only. No logs, domains, devices, IPs,
  * profile configuration or API credentials are ever returned.
+ *
+ * The headline 24h statistics are intentionally kept independent from the
+ * chart request. If a time-series request is rejected by the NextDNS API,
+ * the public dashboard remains ONLINE and simply falls back to a single
+ * aggregate chart point.
  */
 export async function onRequest(context) {
   const key = context.env.NEXTDNS_API_KEY;
@@ -23,52 +28,91 @@ export async function onRequest(context) {
   };
   const cfg = configs[requested] || configs["24h"];
 
-  try {
-    const headers = { "X-Api-Key": key, "Accept": "application/json" };
-    const base = `https://api.nextdns.io/profiles/${encodeURIComponent(profile)}/analytics`;
-    const qs = `from=${encodeURIComponent(cfg.from)}&interval=${encodeURIComponent(cfg.interval)}&alignment=clock&partials=all&limit=500`;
+  const headers = {
+    "X-Api-Key": key,
+    "Accept": "application/json"
+  };
+  const base = `https://api.nextdns.io/profiles/${encodeURIComponent(profile)}/analytics`;
 
-    const [statusRes, encryptionRes, dnssecRes] = await Promise.all([
-      fetch(`${base}/status;series?${qs}`, { headers }),
+  try {
+    // These are the critical requests. If status works, the dashboard is
+    // considered healthy even when optional analytics/chart requests fail.
+    const [status24Res, encryptionRes, dnssecRes] = await Promise.all([
+      fetch(`${base}/status?from=-24h&limit=100`, { headers }),
       fetch(`${base}/encryption?from=-24h&limit=100`, { headers }),
       fetch(`${base}/dnssec?from=-24h&limit=100`, { headers })
     ]);
 
-    if (!statusRes.ok) throw new Error(`NextDNS status request failed (${statusRes.status})`);
+    if (!status24Res.ok) {
+      throw new Error(`NextDNS status request failed (${status24Res.status})`);
+    }
 
-    const statusJson = await statusRes.json();
-    const encJson = encryptionRes.ok ? await encryptionRes.json() : { data: [] };
-    const dnssecJson = dnssecRes.ok ? await dnssecRes.json() : { data: [] };
-
-    const rows = Array.isArray(statusJson.data) ? statusJson.data : [];
-    const times = Array.isArray(statusJson.meta?.series?.times) ? statusJson.meta.series.times : [];
-
-    // Aggregate status categories into one anonymous value per time bucket.
-    const series = times.map((time, i) => ({
-      time,
-      queries: rows.reduce((sum, row) => sum + num(Array.isArray(row.queries) ? row.queries[i] : 0), 0)
-    }));
-
-    // The headline cards intentionally remain 24-hour statistics.
-    const status24 = await fetch(`${base}/status?from=-24h&limit=100`, { headers });
-    if (!status24.ok) throw new Error(`NextDNS 24h status request failed (${status24.status})`);
-    const status24Json = await status24.json();
+    const status24Json = await status24Res.json();
     const status24Rows = Array.isArray(status24Json.data) ? status24Json.data : [];
+
     const queries24h = status24Rows.reduce((n, x) => n + num(x.queries), 0);
     const blocked24h = status24Rows
       .filter(x => String(x.status || "").toLowerCase() === "blocked")
       .reduce((n, x) => n + num(x.queries), 0);
 
+    const encJson = encryptionRes.ok ? await encryptionRes.json() : { data: [] };
     const encRows = Array.isArray(encJson.data) ? encJson.data : [];
     const encrypted24h = encRows
-      .filter(x => x.encrypted === true || String(x.encrypted).toLowerCase() === "true" || String(x.encryption || "").toLowerCase() === "encrypted")
+      .filter(x =>
+        x.encrypted === true ||
+        String(x.encrypted).toLowerCase() === "true" ||
+        String(x.encryption || "").toLowerCase() === "encrypted"
+      )
       .reduce((n, x) => n + num(x.queries), 0);
 
+    const dnssecJson = dnssecRes.ok ? await dnssecRes.json() : { data: [] };
     const dnssecRows = Array.isArray(dnssecJson.data) ? dnssecJson.data : [];
     const dnssec24h = dnssecRows.some(x =>
-      x.validated === true || String(x.validated).toLowerCase() === "true" ||
+      x.validated === true ||
+      String(x.validated).toLowerCase() === "true" ||
       String(x.status || "").toLowerCase() === "validated"
     );
+
+    // Try the requested time series separately. A chart failure must never
+    // turn the whole public endpoint OFFLINE.
+    let series = [];
+    try {
+      const qs = new URLSearchParams({
+        from: cfg.from,
+        interval: cfg.interval,
+        alignment: "clock",
+        partials: "all",
+        limit: "500"
+      });
+
+      const seriesRes = await fetch(`${base}/status;series?${qs.toString()}`, { headers });
+      if (seriesRes.ok) {
+        const seriesJson = await seriesRes.json();
+        const rows = Array.isArray(seriesJson.data) ? seriesJson.data : [];
+        const times = Array.isArray(seriesJson.meta?.series?.times)
+          ? seriesJson.meta.series.times
+          : [];
+
+        series = times.map((time, i) => ({
+          time,
+          queries: rows.reduce(
+            (sum, row) => sum + num(Array.isArray(row.queries) ? row.queries[i] : 0),
+            0
+          )
+        }));
+      }
+    } catch (_) {
+      // Keep the endpoint healthy and use the aggregate fallback below.
+    }
+
+    // If NextDNS rejected the series request, show one truthful aggregate
+    // point rather than an empty/offline dashboard.
+    if (!series.length) {
+      series = [{
+        time: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        queries: queries24h
+      }];
+    }
 
     return json({
       publicName,
@@ -79,7 +123,7 @@ export async function onRequest(context) {
       dnssec24h,
       series
     });
-  } catch (e) {
+  } catch (_) {
     return json({ error: "Unable to fetch public network statistics." }, 502);
   }
 }
