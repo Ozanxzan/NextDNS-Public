@@ -12,33 +12,8 @@ const ranges = {
 
 let selectedRange = "24h";
 
-function renderSeries(series, rangeKey) {
-  const bars = $("#bars");
-  if (!bars) return;
-  bars.innerHTML = "";
-
-  const values = Array.isArray(series) ? series : [];
-  const max = Math.max(...values.map(x => Number(x.queries) || 0), 1);
-
-  values.forEach((x, i) => {
-    const b = document.createElement("i");
-    b.className = "bar";
-    const q = Number(x.queries) || 0;
-    b.style.height = Math.max(3, Math.round(q / max * 100)) + "%";
-    const d = x.time ? new Date(x.time) : null;
-    const label = d && !Number.isNaN(d.getTime())
-      ? d.toLocaleString([], { month: "short", day: "numeric", hour: rangeKey === "24h" ? "2-digit" : undefined, minute: rangeKey === "24h" ? "2-digit" : undefined })
-      : `Period ${i + 1}`;
-    b.title = `${label}: ${fmt(q)} queries`;
-    bars.append(b);
-  });
-
-  const axis = ranges[rangeKey].axis;
-  const axisEls = $("#chartAxis")?.querySelectorAll("span") || [];
-  axisEls.forEach((el, i) => { if (axis[i]) el.textContent = axis[i]; });
-
-  set("rangeBadge", ranges[rangeKey].label);
-  set("rangeLabel", rangeKey === "24h" ? "LAST 24H" : ranges[rangeKey].label);
+function renderSeries() {
+  // The public dashboard intentionally shows aggregate statistics without a graph.
 }
 
 async function loadRange(rangeKey) {
