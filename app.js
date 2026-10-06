@@ -32,16 +32,52 @@ function renderReasons(reasons) {
 }
 
 
+function eyeIcon(hidden = true) {
+  return hidden
+    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>'
+    : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18"></path><path d="M10.6 6.2A10.7 10.7 0 0 1 12 6c6.5 0 10 6 10 6a18.7 18.7 0 0 1-3.2 3.8M6.2 6.9C3.6 8.7 2 12 2 12s3.5 6 10 6c1.3 0 2.5-.2 3.6-.7"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg>';
+}
+
+function maskedEndpoint(value) {
+  const text = String(value || "—");
+  if (text === "—") return text;
+  return text.replace(/[^\s:/.-]/g, "*");
+}
+
+function endpointValue(value, key) {
+  const raw = String(value || "—");
+  return `<div class="endpoint-secret" data-endpoint-key="${escapeHtml(key)}" data-value="${escapeHtml(raw)}" data-hidden="true"><span class="endpoint-value endpoint-masked">${escapeHtml(maskedEndpoint(raw))}</span><button class="endpoint-eye" type="button" aria-label="Show endpoint" aria-pressed="false">${eyeIcon(true)}</button></div>`;
+}
+
 function renderEndpoints(endpoints) {
   const box = $("#endpointsList");
   if (!box) return;
   const e = endpoints || {};
   const ipv6 = Array.isArray(e.ipv6) ? e.ipv6 : [];
+  const ipv6Html = ipv6.length
+    ? ipv6.map((v, i) => endpointValue(v, `ipv6-${i}`)).join("")
+    : endpointValue("—", "ipv6-0");
+
   box.innerHTML = `
-    <div class="endpoint-row"><strong>DNS-over-TLS/QUIC</strong><span class="endpoint-value">${escapeHtml(String(e.dot || "—"))}</span></div>
-    <div class="endpoint-row"><strong>DNS-over-HTTPS</strong><span class="endpoint-value">${escapeHtml(String(e.doh || "—"))}</span></div>
-    <div class="endpoint-row"><strong>IPv6</strong>${ipv6.length ? ipv6.map(v => `<span class="endpoint-value">${escapeHtml(String(v))}</span>`).join("") : '<span class="endpoint-value">—</span>'}</div>
+    <div class="endpoint-row"><strong>DNS-over-TLS/QUIC</strong>${endpointValue(e.dot || "—", "dot")}</div>
+    <div class="endpoint-row"><strong>DNS-over-HTTPS</strong>${endpointValue(e.doh || "—", "doh")}</div>
+    <div class="endpoint-row"><strong>IPv6</strong>${ipv6Html}</div>
   `;
+
+  box.querySelectorAll(".endpoint-eye").forEach(button => {
+    button.addEventListener("click", () => {
+      const wrap = button.closest(".endpoint-secret");
+      if (!wrap) return;
+      const hidden = wrap.dataset.hidden === "true";
+      const value = wrap.dataset.value || "—";
+      const valueEl = wrap.querySelector(".endpoint-value");
+      if (valueEl) valueEl.textContent = hidden ? value : maskedEndpoint(value);
+      wrap.dataset.hidden = String(!hidden);
+      button.setAttribute("aria-pressed", String(hidden));
+      button.setAttribute("aria-label", hidden ? "Hide endpoint" : "Show endpoint");
+      button.innerHTML = eyeIcon(!hidden);
+    });
+  });
 }
 
 function escapeHtml(value) {
