@@ -113,12 +113,16 @@ function renderSecurityFeatures(security) {
 
 async function loadRange(rangeKey) {
   selectedRange = rangeKey;
+  set("edgePerformance", "EDGE • CHECKING");
   const cfg = ranges[rangeKey];
   const select = $("#rangeSelect");
   if (select && select.value !== rangeKey) select.value = rangeKey;
 
   try {
-    const r = await fetch(`/api/public?range=${encodeURIComponent(rangeKey)}`);
+    const edgeStart = performance.now();
+    const r = await fetch(`/api/public?range=${encodeURIComponent(rangeKey)}&_=${Date.now()}`, { cache: "no-store" });
+    const edgeMs = Math.max(1, Math.round(performance.now() - edgeStart));
+    set("edgePerformance", `EDGE • ${edgeMs}ms • ONLINE`);
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Unable to load public data");
 
@@ -149,6 +153,7 @@ async function loadRange(rangeKey) {
     renderSeries(d.series || [], rangeKey);
   } catch (e) {
     set("networkState", "OFFLINE");
+    set("edgePerformance", "EDGE • OFFLINE");
     set("updated", e.message);
   }
 }
