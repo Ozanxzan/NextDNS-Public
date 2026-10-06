@@ -10,9 +10,9 @@
 <body>
 <div class="ambient"></div>
 <header class="top">
-  <a class="brand" href="/">
+  <a class="brand" href="https://nazuaf.com" aria-label="Nazuaf DNS">
     <span class="mark">N</span>
-    <span><b>NAZUAF DNS</b><small>PUBLIC NETWORK STATUS</small></span>
+    <span><b>NAZUAF DNS</b></span>
   </a>
   <div class="top-right">
     <span class="live"><i></i> LIVE</span>
@@ -30,7 +30,7 @@
     <div class="hero-status">
       <div class="pulse"></div>
       <b id="networkState">CONNECTING</b>
-      <small id="updated">Waiting for data…</small>
+      <small id="updated">Waiting for data…</small><small id="updatedDate"></small>
     </div>
   </section>
 
@@ -53,6 +53,16 @@
     <article class="card stat"><small>BLOCKED</small><strong id="blocked" class="red">—</strong><span>Threats & unwanted requests</span></article>
     <article class="card stat"><small>BLOCK RATE</small><strong id="rate" class="cyan">—</strong><span>Filtering effectiveness</span></article>
     <article class="card stat"><small>ENCRYPTED</small><strong id="encrypted" class="violet">—</strong><span>Encrypted DNS traffic</span></article>
+  </section>
+
+  <section class="card reasons-card">
+    <div class="reasons-head">
+      <div>
+        <h2>Reasons for Blocking</h2>
+        <p>Security, Privacy and/or Parental Control settings that blocked the most queries.</p>
+      </div>
+    </div>
+    <div id="reasonsList" class="reasons-list"></div>
   </section>
 
   <section class="grid">

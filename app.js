@@ -16,6 +16,25 @@ function renderSeries() {
   // The public dashboard intentionally shows aggregate statistics without a graph.
 }
 
+function renderReasons(reasons) {
+  const box = $("#reasonsList");
+  if (!box) return;
+  const rows = Array.isArray(reasons) ? reasons.slice(0, 6) : [];
+  if (!rows.length) {
+    box.innerHTML = '<div class="reason-empty">No blocking reason data available.</div>';
+    return;
+  }
+  box.innerHTML = rows.map(row => {
+    const name = String(row.name || row.id || "Unknown reason");
+    const queries = fmt(row.queries);
+    return `<div class="reason-row"><span>${escapeHtml(name)}</span><b>${queries}</b></div>`;
+  }).join('');
+}
+
+function escapeHtml(value) {
+  return value.replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[ch]));
+}
+
 async function loadRange(rangeKey) {
   selectedRange = rangeKey;
   const cfg = ranges[rangeKey];
@@ -42,8 +61,13 @@ async function loadRange(rangeKey) {
     set("dnssec", d.dnssec ? "ACTIVE" : (d.dnssec24h ? "ACTIVE" : "—"));
 
     set("networkState", "ONLINE");
-    set("updated", "Updated " + new Date(d.generatedAt).toLocaleTimeString());
+    const updatedAt = new Date(d.generatedAt);
+    const time = updatedAt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).replace(/:/g, ".");
+    const date = updatedAt.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "short", year: "numeric" });
+    set("updated", "Updated " + time);
+    set("updatedDate", date);
     set("profileName", d.publicName || "Nazuaf DNS");
+    renderReasons(d.reasons || []);
     renderSeries(d.series || [], rangeKey);
   } catch (e) {
     set("networkState", "OFFLINE");
