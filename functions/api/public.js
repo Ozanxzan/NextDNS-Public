@@ -144,10 +144,17 @@ export async function onRequest(context) {
       }];
     }
 
+    const endpoints = {
+      dot: `${profile}.dns.nextdns.io`,
+      doh: `https://dns.nextdns.io/${profile}`,
+      ipv6: [`2a07:a8c0::${profile}`, `2a07:a8c1::${profile}`]
+    };
+
     return json({
       publicName,
       generatedAt: new Date().toISOString(),
       range: requested,
+      endpoints,
       queries,
       blocked,
       encrypted,
