@@ -49,7 +49,6 @@ function escapeHtml(value) {
 }
 
 
-let expectedProfile = "";
 
 function setConnectionState(state, data = {}) {
   const card = $(".connection-check");
@@ -66,9 +65,7 @@ function setConnectionState(state, data = {}) {
   if (state === "ok") {
     card.classList.add("is-ok"); icon.classList.add("is-ok");
     title.textContent = "All good!";
-    message.textContent = expectedProfile && data.profile === expectedProfile
-      ? "This device is using NextDNS with this profile."
-      : "This device is using NextDNS with a profile.";
+    message.textContent = "This device is using NextDNS.";
     meta.hidden = false;
     set("connectionProtocol", String(data.protocol || "NextDNS"));
     set("connectionServer", String(data.server || "Connected"));
@@ -79,6 +76,14 @@ function setConnectionState(state, data = {}) {
     message.textContent = "This device is reaching NextDNS, but no profile is currently attached.";
     meta.hidden = false;
     set("connectionProtocol", String(data.protocol || "Detected"));
+    set("connectionServer", String(data.server || "NextDNS"));
+    set("connectionRoute", data.anycast ? "Anycast" : "Direct");
+  } else if (state === "warn") {
+    card.classList.add("is-warn"); icon.classList.add("is-warn");
+    title.textContent = "NextDNS detected";
+    message.textContent = "This device reached NextDNS, but the detected configuration does not match the expected profile.";
+    meta.hidden = false;
+    set("connectionProtocol", String(data.protocol || "NextDNS"));
     set("connectionServer", String(data.server || "NextDNS"));
     set("connectionRoute", data.anycast ? "Anycast" : "Direct");
   } else if (state === "error") {
@@ -101,10 +106,15 @@ async function checkNextDNSConnection() {
     const r = await fetch("https://test.nextdns.io/", { cache: "no-store" });
     if (!r.ok) throw new Error("test request failed");
     const d = await r.json();
-    if (d.status === "ok" && d.profile) {
+    const status = String(d.status || "").toLowerCase();
+    if (status === "ok") {
+      // NextDNS considers status=ok the authoritative signal that this
+      // device is using NextDNS. Do not require a profile field or compare
+      // the tester's encrypted/internal profile identifier with the public
+      // configuration ID; they are not guaranteed to be the same.
       setConnectionState("ok", d);
-    } else if (d.status === "ok") {
-      setConnectionState("unconfigured", d);
+    } else if (status === "mismatch") {
+      setConnectionState("warn", d);
     } else {
       setConnectionState("error", d);
     }
@@ -147,7 +157,6 @@ async function loadRange(rangeKey) {
     set("profileName", d.publicName || "Nazuaf DNS");
     renderReasons(d.reasons || []);
     renderEndpoints(d.endpoints || {});
-    expectedProfile = String(d.endpoints?.doh || "").split("/").pop() || "";
     renderSeries(d.series || [], rangeKey);
     checkNextDNSConnection();
   } catch (e) {
