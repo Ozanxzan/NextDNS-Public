@@ -1,25 +1,32 @@
 /**
- * DNS resolver check for the public dashboard.
+ * DNS resolver verification for the public dashboard.
  *
- * The browser first resolves a unique hostname under test.dnscheck.tools.
- * That DNS lookup therefore happens through the visitor's actual DNS path.
- * This endpoint only reads the resulting public watch page and returns a
- * privacy-minimized classification; resolver/client IPs are never returned.
+ * The browser creates a unique DNS lookup under test.dnscheck.tools.
+ * dnscheck.tools associates that lookup with /watch/<id>. This endpoint
+ * reads the public watch page and returns only a coarse classification.
+ * Resolver IPs, client IPs and other identifying data are never returned.
  */
 export async function onRequestGet(context) {
-  const id = new URL(context.request.url).searchParams.get("id") || "";
+  const url = new URL(context.request.url);
+  const id = url.searchParams.get("id") || "";
 
-  if (!/^[0-9a-f]{6,16}$/i.test(id)) {
+  if (!/^[0-9a-f]{12}$/i.test(id)) {
     return json({ ok: false, status: "invalid" }, 400);
   }
 
   try {
-    const r = await fetch(`https://dnscheck.tools/watch/${id}`, {
-      headers: { "Accept": "text/html,application/xhtml+xml" },
+    const r = await fetch(`https://dnscheck.tools/watch/${id}?cb=${Date.now()}`, {
+      method: "GET",
+      headers: {
+        "Accept": "text/html,application/xhtml+xml",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "User-Agent": "Nazuaf DNS Checker/1.0"
+      },
       cf: { cacheTtl: 0, cacheEverything: false }
     });
 
-    if (!r.ok) return json({ ok: false, status: "pending" }, 200);
+    if (!r.ok) return json({ ok: false, status: "pending" });
 
     const html = await r.text();
     const text = html
@@ -27,12 +34,11 @@ export async function onRequestGet(context) {
       .replace(/<style[\s\S]*?<\/style>/gi, " ")
       .replace(/<[^>]+>/g, " ")
       .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
       .replace(/\s+/g, " ")
       .toLowerCase();
 
-    const nextdns = /nextdns|dns\.nextdns\.io/.test(text);
-
-    if (nextdns) {
+    if (/nextdns|dns\.nextdns\.io/.test(text)) {
       return json({
         ok: true,
         status: "ok",
@@ -41,10 +47,12 @@ export async function onRequestGet(context) {
       });
     }
 
-    // The watch page may not have a resolver result immediately after the
-    // browser's DNS lookup. Treat an empty/unfinished page as pending.
-    const hasResolver = /dns resolver|your dns resolvers|resolver|nameserver/.test(text);
-    if (!hasResolver || text.length < 80) {
+    // A watch page may exist before the resolver result is populated.
+    // Do not report a false negative until a resolver is actually visible.
+    const resolverWords = /your dns resolvers|dns resolvers|resolver|nameserver/.test(text);
+    const unfinished = /detecting|pending|loading/.test(text);
+
+    if (!resolverWords || unfinished || text.length < 80) {
       return json({ ok: false, status: "pending" });
     }
 
@@ -64,7 +72,8 @@ function json(data, status = 200) {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "Pragma": "no-cache",
       "X-Content-Type-Options": "nosniff"
     }
   });
