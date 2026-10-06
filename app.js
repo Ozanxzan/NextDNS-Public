@@ -103,29 +103,46 @@ function setConnectionState(state, data = {}) {
 async function checkNextDNSConnection() {
   setConnectionState("checking");
   try {
-    // The root test.nextdns.io endpoint is an HTML redirect/helper and is not
-    // suitable for browser fetch(). NextDNS uses a random subdomain for the
-    // actual JSON test endpoint, which is CORS-enabled.
-    const token = (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") :
-      Math.random().toString(36).slice(2) + Date.now().toString(36));
-    const r = await fetch(`https://${token}.test.nextdns.io/`, {
-      cache: "no-store",
-      headers: { "Accept": "application/json" }
-    });
-    if (!r.ok) throw new Error("test request failed");
-    const d = await r.json();
-    const status = String(d.status || "").toLowerCase();
-    if (status === "ok") {
-      // NextDNS considers status=ok the authoritative signal that this
-      // device is using NextDNS. Do not require a profile field or compare
-      // the tester's encrypted/internal profile identifier with the public
-      // configuration ID; they are not guaranteed to be the same.
-      setConnectionState("ok", d);
-    } else if (status === "mismatch") {
-      setConnectionState("warn", d);
-    } else {
-      setConnectionState("error", d);
+    // DNS-check approach: force the visitor's browser to resolve a unique
+    // test hostname. This observes the DNS path actually used by the client,
+    // including Android Private DNS/DoT and VPN-provided DNS.
+    const bytes = new Uint8Array(6);
+    crypto.getRandomValues(bytes);
+    const id = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+
+    // A real browser resource request is enough to trigger DNS resolution.
+    // The response itself is irrelevant; the unique hostname is what matters.
+    const probe = new Image();
+    probe.referrerPolicy = "no-referrer";
+    probe.src = `https://${id}.test.dnscheck.tools/favicon.ico?${Date.now()}`;
+
+    // Give the resolver/checker a moment to record the lookup, then ask our
+    // same-origin Worker function to read the public watch result.
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const r = await fetch(`/api/dnscheck?id=${id}`, { cache: "no-store" });
+      if (!r.ok) throw new Error("DNS check failed");
+      const d = await r.json();
+
+      if (d.status === "ok") {
+        setConnectionState("ok", {
+          protocol: "DNS checker",
+          server: d.provider || "NextDNS",
+          anycast: false
+        });
+        return;
+      }
+
+      if (d.status === "other") {
+        setConnectionState("error", d);
+        return;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 700));
     }
+
+    setConnectionState("error");
   } catch (_) {
     setConnectionState("error");
   }
