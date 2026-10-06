@@ -37,18 +37,29 @@ export async function onRequest(context) {
   try {
     // These are the critical requests. If status works, the dashboard is
     // considered healthy even when optional analytics/chart requests fail.
-    const [status24Res, encryptionRes, dnssecRes] = await Promise.all([
+    const [statusRangeRes, status24Res, encryptionRes, dnssecRes] = await Promise.all([
+      fetch(`${base}/status?from=${encodeURIComponent(cfg.from)}&limit=100`, { headers }),
       fetch(`${base}/status?from=-24h&limit=100`, { headers }),
-      fetch(`${base}/encryption?from=-24h&limit=100`, { headers }),
-      fetch(`${base}/dnssec?from=-24h&limit=100`, { headers })
+      fetch(`${base}/encryption?from=${encodeURIComponent(cfg.from)}&limit=100`, { headers }),
+      fetch(`${base}/dnssec?from=${encodeURIComponent(cfg.from)}&limit=100`, { headers })
     ]);
 
+    if (!statusRangeRes.ok) {
+      throw new Error(`NextDNS range status request failed (${statusRangeRes.status})`);
+    }
     if (!status24Res.ok) {
-      throw new Error(`NextDNS status request failed (${status24Res.status})`);
+      throw new Error(`NextDNS 24h status request failed (${status24Res.status})`);
     }
 
+    const statusRangeJson = await statusRangeRes.json();
+    const statusRangeRows = Array.isArray(statusRangeJson.data) ? statusRangeJson.data : [];
     const status24Json = await status24Res.json();
     const status24Rows = Array.isArray(status24Json.data) ? status24Json.data : [];
+
+    const queries = statusRangeRows.reduce((n, x) => n + num(x.queries), 0);
+    const blocked = statusRangeRows
+      .filter(x => String(x.status || "").toLowerCase() === "blocked")
+      .reduce((n, x) => n + num(x.queries), 0);
 
     const queries24h = status24Rows.reduce((n, x) => n + num(x.queries), 0);
     const blocked24h = status24Rows
@@ -57,7 +68,7 @@ export async function onRequest(context) {
 
     const encJson = encryptionRes.ok ? await encryptionRes.json() : { data: [] };
     const encRows = Array.isArray(encJson.data) ? encJson.data : [];
-    const encrypted24h = encRows
+    const encrypted = encRows
       .filter(x =>
         x.encrypted === true ||
         String(x.encrypted).toLowerCase() === "true" ||
@@ -65,13 +76,29 @@ export async function onRequest(context) {
       )
       .reduce((n, x) => n + num(x.queries), 0);
 
+    // Keep 24h encryption too for backwards compatibility.
+    let encrypted24h = encrypted;
+    if (requested !== "24h") {
+      try {
+        const e24 = await fetch(`${base}/encryption?from=-24h&limit=100`, { headers });
+        if (e24.ok) {
+          const e24j = await e24.json();
+          const e24rows = Array.isArray(e24j.data) ? e24j.data : [];
+          encrypted24h = e24rows
+            .filter(x => x.encrypted === true || String(x.encrypted).toLowerCase() === "true" || String(x.encryption || "").toLowerCase() === "encrypted")
+            .reduce((n, x) => n + num(x.queries), 0);
+        }
+      } catch (_) {}
+    }
+
     const dnssecJson = dnssecRes.ok ? await dnssecRes.json() : { data: [] };
     const dnssecRows = Array.isArray(dnssecJson.data) ? dnssecJson.data : [];
-    const dnssec24h = dnssecRows.some(x =>
+    const dnssec = dnssecRows.some(x =>
       x.validated === true ||
       String(x.validated).toLowerCase() === "true" ||
       String(x.status || "").toLowerCase() === "validated"
     );
+    const dnssec24h = dnssec;
 
     // Try the requested time series separately. A chart failure must never
     // turn the whole public endpoint OFFLINE.
@@ -117,6 +144,11 @@ export async function onRequest(context) {
     return json({
       publicName,
       generatedAt: new Date().toISOString(),
+      range: requested,
+      queries,
+      blocked,
+      encrypted,
+      dnssec,
       queries24h,
       blocked24h,
       encrypted24h,
