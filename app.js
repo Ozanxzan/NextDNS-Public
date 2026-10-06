@@ -48,124 +48,31 @@ function escapeHtml(value) {
   return value.replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[ch]));
 }
 
+function renderSecurityFeatures(security) {
+  const box = $("#securityFeaturesList");
+  if (!box) return;
 
+  const cfg = security || {};
+  const features = [
+    ["Threat Intelligence Feeds", cfg.threatIntelligenceFeeds],
+    ["AI-Driven Threat Detection", cfg.aiThreatDetection],
+    ["Google Safe Browsing", cfg.googleSafeBrowsing],
+    ["Cryptojacking Protection", cfg.cryptojacking],
+    ["DNS Rebinding Protection", cfg.dnsRebinding],
+    ["IDN Homograph Attacks Protection", cfg.idnHomographs],
+    ["Typosquatting Protection", cfg.typosquatting],
+    ["Domain Generation Algorithms (DGA) Protection", cfg.dga],
+    ["Block Newly Registered Domains (NRDs)", cfg.nrd],
+    ["Block Dynamic DNS Hostnames", cfg.ddns],
+    ["Block Parked Domains", cfg.parking],
+    ["Block Child Sexual Abuse Material", cfg.csam],
+    ["Block Top-Level Domains (TLDs)", Array.isArray(cfg.tlds) && cfg.tlds.length > 0]
+  ];
 
-function setConnectionState(state, data = {}) {
-  const card = $(".connection-check");
-  const title = $("#connectionTitle");
-  const message = $("#connectionMessage");
-  const icon = $("#connectionIcon");
-  const meta = $("#connectionMeta");
-  const refresh = $("#connectionRefresh");
-  if (!card || !title || !message || !icon || !meta || !refresh) return;
-
-  card.classList.remove("is-ok", "is-warn", "is-error", "is-checking");
-  icon.classList.remove("is-ok", "is-warn", "is-error", "is-checking");
-
-  if (state === "ok") {
-    card.classList.add("is-ok"); icon.classList.add("is-ok");
-    title.textContent = "All good!";
-    message.textContent = "This device is using NextDNS.";
-    meta.hidden = false;
-    set("connectionProtocol", String(data.protocol || "NextDNS"));
-    set("connectionServer", String(data.server || "Connected"));
-    set("connectionRoute", data.anycast ? "Anycast" : "Ultra-low latency");
-  } else if (state === "unconfigured") {
-    card.classList.add("is-warn"); icon.classList.add("is-warn");
-    title.textContent = "NextDNS detected";
-    message.textContent = "This device is reaching NextDNS, but no profile is currently attached.";
-    meta.hidden = false;
-    set("connectionProtocol", String(data.protocol || "Detected"));
-    set("connectionServer", String(data.server || "NextDNS"));
-    set("connectionRoute", data.anycast ? "Anycast" : "Direct");
-  } else if (state === "warn") {
-    card.classList.add("is-warn"); icon.classList.add("is-warn");
-    title.textContent = "NextDNS detected";
-    message.textContent = "This device reached NextDNS, but the detected configuration does not match the expected profile.";
-    meta.hidden = false;
-    set("connectionProtocol", String(data.protocol || "NextDNS"));
-    set("connectionServer", String(data.server || "NextDNS"));
-    set("connectionRoute", data.anycast ? "Anycast" : "Direct");
-  } else if (state === "error") {
-    card.classList.add("is-error"); icon.classList.add("is-error");
-    title.textContent = "Not using NextDNS";
-    message.textContent = "This device is not currently detected on NextDNS.";
-    meta.hidden = true;
-  } else {
-    card.classList.add("is-checking"); icon.classList.add("is-checking");
-    title.textContent = "Checking connection…";
-    message.textContent = "Checking this device's current DNS connection.";
-    meta.hidden = true;
-  }
-  refresh.disabled = state === "checking";
-}
-
-async function checkNextDNSConnection() {
-  const statusEl = $("#connectionStatus");
-  const detailEl = $("#connectionDetail");
-  const refreshEl = $("#connectionRefresh");
-
-  if (!statusEl || !detailEl) return;
-
-  statusEl.textContent = "Checking...";
-  statusEl.className = "connection-status checking";
-  detailEl.textContent = "Checking this device's DNS resolver...";
-  if (refreshEl) refreshEl.disabled = true;
-
-  try {
-    const bytes = new Uint8Array(6);
-    crypto.getRandomValues(bytes);
-    const id = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
-
-    // Resolve a unique dnscheck.tools hostname through the device's actual DNS path.
-    // A/AAAA requests are enough for dnscheck.tools to associate the request with /watch.
-    await new Promise(resolve => {
-      const probe = new Image();
-      probe.onload = probe.onerror = probe.onabort = resolve;
-      probe.src = `https://${id}.test.dnscheck.tools/favicon.ico?cb=${Date.now()}`;
-      setTimeout(resolve, 2500);
-    });
-
-    // The resolver result can take a few seconds to appear on the watch page.
-    let last = null;
-    for (let i = 0; i < 10; i++) {
-      const r = await fetch(`/api/dnscheck?id=${id}&t=${Date.now()}`, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" }
-      });
-      last = await r.json();
-
-      if (last.status === "ok") {
-        statusEl.textContent = "Connected";
-        statusEl.className = "connection-status ok";
-        detailEl.textContent = "This device is using NextDNS.";
-        return;
-      }
-
-      if (last.status === "other") {
-        statusEl.textContent = "Not using NextDNS";
-        statusEl.className = "connection-status error";
-        detailEl.textContent = last.provider
-          ? `Detected resolver: ${last.provider}.`
-          : "Another DNS resolver was detected.";
-        return;
-      }
-
-      await new Promise(r => setTimeout(r, 800));
-    }
-
-    // Never claim the device is not using NextDNS when the checker simply
-    // could not obtain a result in time.
-    statusEl.textContent = "Unable to verify";
-    statusEl.className = "connection-status checking";
-    detailEl.textContent = "DNS checker did not return a result. Tap Check Again.";
-  } catch (_) {
-    statusEl.textContent = "Unable to verify";
-    statusEl.className = "connection-status checking";
-    detailEl.textContent = "DNS checker could not be reached. Tap Check Again.";
-  } finally {
-    if (refreshEl) refreshEl.disabled = false;
-  }
+  box.innerHTML = features.map(([name, enabled]) => {
+    const active = enabled === true;
+    return `<div class="security-feature-row"><span class="security-feature-name">${escapeHtml(name)}</span><b class="security-feature-status${active ? "" : " off"}">${active ? "ACTIVE" : "OFF"}</b></div>`;
+  }).join("");
 }
 
 async function loadRange(rangeKey) {
@@ -192,6 +99,7 @@ async function loadRange(rangeKey) {
     set("filtering", b > 0 ? "ACTIVE" : "READY");
     set("encState", enc > 0 ? "ACTIVE" : "—");
     set("dnssec", d.dnssec ? "ACTIVE" : (d.dnssec24h ? "ACTIVE" : "—"));
+    renderSecurityFeatures(d.security || {});
 
     set("networkState", "ONLINE");
     const updatedAt = new Date(d.generatedAt);
@@ -203,7 +111,6 @@ async function loadRange(rangeKey) {
     renderReasons(d.reasons || []);
     renderEndpoints(d.endpoints || {});
     renderSeries(d.series || [], rangeKey);
-    checkNextDNSConnection();
   } catch (e) {
     set("networkState", "OFFLINE");
     set("updated", e.message);
@@ -217,6 +124,5 @@ $("#theme")?.addEventListener("click", () => {
 });
 
 if (localStorage.theme === "light") document.body.classList.add("light");
-$("#connectionRefresh")?.addEventListener("click", checkNextDNSConnection);
 loadRange(selectedRange);
 setInterval(() => loadRange(selectedRange), 60000);

@@ -34,24 +34,6 @@
     </div>
   </section>
 
-  <section class="connection-check card" aria-live="polite">
-    <div class="connection-glow" id="connectionGlow"></div>
-    <div class="connection-main">
-      <div class="connection-icon" id="connectionIcon"><span></span></div>
-      <div class="connection-copy">
-        <small class="connection-kicker">DEVICE CONNECTION</small>
-        <h2 id="connectionTitle">Checking connection…</h2>
-        <p id="connectionMessage">Checking whether this device is using NextDNS with the public profile.</p>
-      </div>
-    </div>
-    <div class="connection-meta" id="connectionMeta" hidden>
-      <span id="connectionProtocol">—</span>
-      <span id="connectionServer">—</span>
-      <span id="connectionRoute">—</span>
-    </div>
-    <button class="connection-refresh" id="connectionRefresh" type="button" aria-label="Check NextDNS connection again">↻ <span>Check again</span></button>
-  </section>
-
   <section class="traffic-profile card">
     <div class="card-head chart-head">
       <div><small>TRAFFIC PROFILE</small><h2>Protection activity</h2></div>
@@ -93,6 +75,16 @@
         <div><span>Public telemetry</span><b class="ok">AGGREGATED</b></div>
       </div>
     </article>
+  </section>
+
+  <section class="card security-features-card">
+    <div class="reasons-head security-features-head">
+      <div>
+        <h2>Security Features</h2>
+        <p>Active security protections configured on this NextDNS profile.</p>
+      </div>
+    </div>
+    <div id="securityFeaturesList" class="security-features-list"></div>
   </section>
 
   <section class="card about">
