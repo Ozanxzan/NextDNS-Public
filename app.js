@@ -52,15 +52,19 @@ async function loadRange(rangeKey) {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Unable to load public data");
 
-    if (rangeKey === "24h") {
-      set("queries", fmt(d.queries24h));
-      set("blocked", fmt(d.blocked24h));
-      set("rate", pct(d.blocked24h, d.queries24h) + "%");
-      set("encrypted", pct(d.encrypted24h, d.queries24h) + "%");
-      set("filtering", d.blocked24h > 0 ? "ACTIVE" : "READY");
-      set("encState", d.encrypted24h > 0 ? "ACTIVE" : "—");
-      set("dnssec", d.dnssec24h ? "ACTIVE" : "—");
-    }
+    // The selected range controls the headline numbers too. Previously these
+    // were only updated for 24h, so 7d/30d/3m looked empty even when the API
+    // returned valid data.
+    const q = Number.isFinite(Number(d.queries)) ? Number(d.queries) : Number(d.queries24h || 0);
+    const b = Number.isFinite(Number(d.blocked)) ? Number(d.blocked) : Number(d.blocked24h || 0);
+    const enc = Number.isFinite(Number(d.encrypted)) ? Number(d.encrypted) : Number(d.encrypted24h || 0);
+    set("queries", fmt(q));
+    set("blocked", fmt(b));
+    set("rate", pct(b, q) + "%");
+    set("encrypted", pct(enc, q) + "%");
+    set("filtering", b > 0 ? "ACTIVE" : "READY");
+    set("encState", enc > 0 ? "ACTIVE" : "—");
+    set("dnssec", d.dnssec ? "ACTIVE" : (d.dnssec24h ? "ACTIVE" : "—"));
 
     set("networkState", "ONLINE");
     set("updated", "Updated " + new Date(d.generatedAt).toLocaleTimeString());
