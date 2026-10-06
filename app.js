@@ -48,6 +48,71 @@ function escapeHtml(value) {
   return value.replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[ch]));
 }
 
+
+let expectedProfile = "";
+
+function setConnectionState(state, data = {}) {
+  const card = $(".connection-check");
+  const title = $("#connectionTitle");
+  const message = $("#connectionMessage");
+  const icon = $("#connectionIcon");
+  const meta = $("#connectionMeta");
+  const refresh = $("#connectionRefresh");
+  if (!card || !title || !message || !icon || !meta || !refresh) return;
+
+  card.classList.remove("is-ok", "is-warn", "is-error", "is-checking");
+  icon.classList.remove("is-ok", "is-warn", "is-error", "is-checking");
+
+  if (state === "ok") {
+    card.classList.add("is-ok"); icon.classList.add("is-ok");
+    title.textContent = "All good!";
+    message.textContent = expectedProfile && data.profile === expectedProfile
+      ? "This device is using NextDNS with this profile."
+      : "This device is using NextDNS with a profile.";
+    meta.hidden = false;
+    set("connectionProtocol", String(data.protocol || "NextDNS"));
+    set("connectionServer", String(data.server || "Connected"));
+    set("connectionRoute", data.anycast ? "Anycast" : "Ultra-low latency");
+  } else if (state === "unconfigured") {
+    card.classList.add("is-warn"); icon.classList.add("is-warn");
+    title.textContent = "NextDNS detected";
+    message.textContent = "This device is reaching NextDNS, but no profile is currently attached.";
+    meta.hidden = false;
+    set("connectionProtocol", String(data.protocol || "Detected"));
+    set("connectionServer", String(data.server || "NextDNS"));
+    set("connectionRoute", data.anycast ? "Anycast" : "Direct");
+  } else if (state === "error") {
+    card.classList.add("is-error"); icon.classList.add("is-error");
+    title.textContent = "Not using NextDNS";
+    message.textContent = "This device is not currently detected on NextDNS.";
+    meta.hidden = true;
+  } else {
+    card.classList.add("is-checking"); icon.classList.add("is-checking");
+    title.textContent = "Checking connection…";
+    message.textContent = "Checking this device's current DNS connection.";
+    meta.hidden = true;
+  }
+  refresh.disabled = state === "checking";
+}
+
+async function checkNextDNSConnection() {
+  setConnectionState("checking");
+  try {
+    const r = await fetch("https://test.nextdns.io/", { cache: "no-store" });
+    if (!r.ok) throw new Error("test request failed");
+    const d = await r.json();
+    if (d.status === "ok" && d.profile) {
+      setConnectionState("ok", d);
+    } else if (d.status === "ok") {
+      setConnectionState("unconfigured", d);
+    } else {
+      setConnectionState("error", d);
+    }
+  } catch (_) {
+    setConnectionState("error");
+  }
+}
+
 async function loadRange(rangeKey) {
   selectedRange = rangeKey;
   const cfg = ranges[rangeKey];
@@ -82,7 +147,9 @@ async function loadRange(rangeKey) {
     set("profileName", d.publicName || "Nazuaf DNS");
     renderReasons(d.reasons || []);
     renderEndpoints(d.endpoints || {});
+    expectedProfile = String(d.endpoints?.doh || "").split("/").pop() || "";
     renderSeries(d.series || [], rangeKey);
+    checkNextDNSConnection();
   } catch (e) {
     set("networkState", "OFFLINE");
     set("updated", e.message);
@@ -96,5 +163,6 @@ $("#theme")?.addEventListener("click", () => {
 });
 
 if (localStorage.theme === "light") document.body.classList.add("light");
+$("#connectionRefresh")?.addEventListener("click", checkNextDNSConnection);
 loadRange(selectedRange);
 setInterval(() => loadRange(selectedRange), 60000);

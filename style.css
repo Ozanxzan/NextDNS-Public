@@ -41,3 +41,31 @@ footer{position:fixed;bottom:0;left:0;right:0;border-top:1px solid var(--line);b
 .endpoint-value + .endpoint-value{margin-top:2px}
 .privacy{margin-bottom:0}
 @media(max-width:520px){.endpoint-row{padding:17px 18px}.endpoint-value{font-size:11px}.reasons-head{padding:20px 18px 17px}.reason-row{padding:16px 18px}}
+
+/* v8 modern device connection check */
+.connection-check{margin-bottom:13px;padding:22px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;overflow:hidden;border-color:rgba(73,231,255,.14)}
+.connection-check:before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,rgba(73,231,255,.055),transparent 42%,rgba(90,229,166,.035));pointer-events:none}
+.connection-glow{position:absolute;width:220px;height:220px;left:-90px;top:-100px;background:radial-gradient(circle,rgba(73,231,255,.14),transparent 68%);pointer-events:none}
+.connection-main{display:flex;align-items:center;gap:16px;position:relative;z-index:1;min-width:0}
+.connection-icon{width:54px;height:54px;flex:0 0 54px;border-radius:16px;border:1px solid rgba(73,231,255,.24);background:rgba(73,231,255,.055);display:grid;place-items:center;box-shadow:0 0 32px rgba(73,231,255,.08)}
+.connection-icon span{width:17px;height:17px;border-radius:50%;background:var(--cyan);box-shadow:0 0 20px var(--cyan);transition:.25s}
+.connection-kicker{display:block;color:var(--muted);font-size:8px;letter-spacing:1.8px;margin-bottom:4px}
+.connection-copy h2{font-size:17px;margin:0 0 5px;letter-spacing:-.2px}
+.connection-copy p{font-size:10px;color:var(--muted);line-height:1.55;margin:0;max-width:610px}
+.connection-meta{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:7px;margin-left:70px;margin-top:-2px;grid-column:1/-1}
+.connection-meta span{font-size:8px;letter-spacing:.6px;color:var(--muted);padding:6px 8px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.015)}
+.connection-refresh{position:relative;z-index:1;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--text);border-radius:10px;padding:9px 11px;font:inherit;font-size:9px;cursor:pointer;white-space:nowrap;transition:.2s}
+.connection-refresh:hover{border-color:rgba(73,231,255,.4);transform:translateY(-1px)}
+.connection-refresh:disabled{opacity:.55;cursor:wait;transform:none}
+.connection-check.is-ok{border-color:rgba(90,229,166,.2)}
+.connection-check.is-ok .connection-icon{border-color:rgba(90,229,166,.3);background:rgba(90,229,166,.055);box-shadow:0 0 32px rgba(90,229,166,.08)}
+.connection-check.is-ok .connection-icon span{background:var(--green);box-shadow:0 0 20px var(--green)}
+.connection-check.is-warn{border-color:rgba(255,195,92,.22)}
+.connection-check.is-warn .connection-icon{border-color:rgba(255,195,92,.3);background:rgba(255,195,92,.055)}
+.connection-check.is-warn .connection-icon span{background:#ffc35c;box-shadow:0 0 20px #ffc35c}
+.connection-check.is-error{border-color:rgba(255,95,122,.22)}
+.connection-check.is-error .connection-icon{border-color:rgba(255,95,122,.3);background:rgba(255,95,122,.055)}
+.connection-check.is-error .connection-icon span{background:var(--red);box-shadow:0 0 20px var(--red)}
+.connection-check.is-checking .connection-icon span{animation:connectionPulse 1.1s ease-in-out infinite}
+@keyframes connectionPulse{0%,100%{transform:scale(.75);opacity:.55}50%{transform:scale(1);opacity:1}}
+@media(max-width:560px){.connection-check{grid-template-columns:1fr;gap:12px;padding:18px}.connection-main{gap:13px}.connection-icon{width:48px;height:48px;flex-basis:48px;border-radius:14px}.connection-copy h2{font-size:16px}.connection-copy p{font-size:10px}.connection-refresh{width:100%;padding:10px}.connection-meta{margin-left:61px;margin-top:-4px}}
