@@ -31,6 +31,19 @@ function renderReasons(reasons) {
   }).join('');
 }
 
+
+function renderEndpoints(endpoints) {
+  const box = $("#endpointsList");
+  if (!box) return;
+  const e = endpoints || {};
+  const ipv6 = Array.isArray(e.ipv6) ? e.ipv6 : [];
+  box.innerHTML = `
+    <div class="endpoint-row"><strong>DNS-over-TLS/QUIC</strong><span class="endpoint-value">${escapeHtml(String(e.dot || "—"))}</span></div>
+    <div class="endpoint-row"><strong>DNS-over-HTTPS</strong><span class="endpoint-value">${escapeHtml(String(e.doh || "—"))}</span></div>
+    <div class="endpoint-row"><strong>IPv6</strong>${ipv6.length ? ipv6.map(v => `<span class="endpoint-value">${escapeHtml(String(v))}</span>`).join("") : '<span class="endpoint-value">—</span>'}</div>
+  `;
+}
+
 function escapeHtml(value) {
   return value.replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[ch]));
 }
@@ -68,6 +81,7 @@ async function loadRange(rangeKey) {
     set("updatedDate", date);
     set("profileName", d.publicName || "Nazuaf DNS");
     renderReasons(d.reasons || []);
+    renderEndpoints(d.endpoints || {});
     renderSeries(d.series || [], rangeKey);
   } catch (e) {
     set("networkState", "OFFLINE");

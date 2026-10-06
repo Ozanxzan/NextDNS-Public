@@ -20,3 +20,24 @@ footer{position:fixed;bottom:0;left:0;right:0;border-top:1px solid var(--line);b
 @media(max-width:520px){.chart-head{align-items:flex-start}.chart-controls{flex-direction:column;align-items:flex-end}.chart-controls select{max-width:145px}.chart-meta{margin-top:10px}}
 
 .reasons-card{margin-bottom:13px;padding:0}.reasons-head{padding:24px 20px 20px;border-bottom:1px solid var(--line)}.reasons-head h2{font-size:22px;margin:0 0 10px}.reasons-head p{font-size:12px;color:var(--muted);line-height:1.6;margin:0;max-width:900px}.reasons-list{display:flex;flex-direction:column}.reason-row{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 20px;border-bottom:1px solid var(--line);font-size:13px}.reason-row:last-child{border-bottom:0}.reason-row span{color:var(--text);min-width:0;overflow-wrap:anywhere}.reason-row b{color:var(--muted);font-size:14px;font-weight:500;white-space:nowrap}.reason-empty{padding:20px;color:var(--muted);font-size:12px}
+/* v5 polish: compact Reasons title, refined Security Posture, Endpoints, and bottom Privacy */
+.reasons-head h2{font-size:16px;margin:5px 0 0;font-weight:650}
+.reasons-head p{font-size:11px;line-height:1.55}
+.security-card{padding:20px}
+.security-card .checks{margin-top:16px}
+.security-card .checks div{padding:13px 0}
+.security-card .shield{width:34px;height:34px;border:1px solid rgba(73,231,255,.25);border-radius:10px;display:grid;place-items:center;font-size:13px;background:rgba(73,231,255,.05);box-shadow:0 0 22px rgba(73,231,255,.08)}
+.security-card .checks div:last-child{border-bottom:0}
+.security-card .checks b{padding:5px 8px;border:1px solid rgba(90,229,166,.18);border-radius:999px;background:rgba(90,229,166,.05);font-size:8px;letter-spacing:.7px}
+.endpoints{margin-bottom:13px}
+.endpoints-head{padding:24px 20px 20px;border-bottom:1px solid var(--line)}
+.endpoints-head h2{font-size:16px;margin:5px 0 10px;font-weight:650}
+.endpoints-head p{font-size:11px;color:var(--muted);line-height:1.55;margin:0;max-width:900px}
+.endpoints-list{display:flex;flex-direction:column}
+.endpoint-row{padding:18px 20px;border-bottom:1px solid var(--line)}
+.endpoint-row:last-child{border-bottom:0}
+.endpoint-row strong{display:block;font-size:12px;margin-bottom:7px}
+.endpoint-value{display:block;color:var(--muted);font-size:13px;line-height:1.65;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.endpoint-value + .endpoint-value{margin-top:2px}
+.privacy{margin-bottom:0}
+@media(max-width:520px){.endpoint-row{padding:17px 18px}.endpoint-value{font-size:11px}.reasons-head{padding:20px 18px 17px}.reason-row{padding:16px 18px}}
