@@ -103,7 +103,15 @@ function setConnectionState(state, data = {}) {
 async function checkNextDNSConnection() {
   setConnectionState("checking");
   try {
-    const r = await fetch("https://test.nextdns.io/", { cache: "no-store" });
+    // The root test.nextdns.io endpoint is an HTML redirect/helper and is not
+    // suitable for browser fetch(). NextDNS uses a random subdomain for the
+    // actual JSON test endpoint, which is CORS-enabled.
+    const token = (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") :
+      Math.random().toString(36).slice(2) + Date.now().toString(36));
+    const r = await fetch(`https://${token}.test.nextdns.io/`, {
+      cache: "no-store",
+      headers: { "Accept": "application/json" }
+    });
     if (!r.ok) throw new Error("test request failed");
     const d = await r.json();
     const status = String(d.status || "").toLowerCase();
