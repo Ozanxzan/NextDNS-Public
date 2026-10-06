@@ -101,50 +101,70 @@ function setConnectionState(state, data = {}) {
 }
 
 async function checkNextDNSConnection() {
-  setConnectionState("checking");
+  const statusEl = $("#connectionStatus");
+  const detailEl = $("#connectionDetail");
+  const refreshEl = $("#connectionRefresh");
+
+  if (!statusEl || !detailEl) return;
+
+  statusEl.textContent = "Checking...";
+  statusEl.className = "connection-status checking";
+  detailEl.textContent = "Checking this device's DNS resolver...";
+  if (refreshEl) refreshEl.disabled = true;
+
   try {
-    // DNS-check approach: force the visitor's browser to resolve a unique
-    // test hostname. This observes the DNS path actually used by the client,
-    // including Android Private DNS/DoT and VPN-provided DNS.
     const bytes = new Uint8Array(6);
     crypto.getRandomValues(bytes);
     const id = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
 
-    // A real browser resource request is enough to trigger DNS resolution.
-    // The response itself is irrelevant; the unique hostname is what matters.
-    const probe = new Image();
-    probe.referrerPolicy = "no-referrer";
-    probe.src = `https://${id}.test.dnscheck.tools/favicon.ico?${Date.now()}`;
+    // Resolve a unique dnscheck.tools hostname through the device's actual DNS path.
+    // A/AAAA requests are enough for dnscheck.tools to associate the request with /watch.
+    await new Promise(resolve => {
+      const probe = new Image();
+      probe.onload = probe.onerror = probe.onabort = resolve;
+      probe.src = `https://${id}.test.dnscheck.tools/favicon.ico?cb=${Date.now()}`;
+      setTimeout(resolve, 2500);
+    });
 
-    // Give the resolver/checker a moment to record the lookup, then ask our
-    // same-origin Worker function to read the public watch result.
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    // The resolver result can take a few seconds to appear on the watch page.
+    let last = null;
+    for (let i = 0; i < 10; i++) {
+      const r = await fetch(`/api/dnscheck?id=${id}&t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      });
+      last = await r.json();
 
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const r = await fetch(`/api/dnscheck?id=${id}`, { cache: "no-store" });
-      if (!r.ok) throw new Error("DNS check failed");
-      const d = await r.json();
-
-      if (d.status === "ok") {
-        setConnectionState("ok", {
-          protocol: "DNS checker",
-          server: d.provider || "NextDNS",
-          anycast: false
-        });
+      if (last.status === "ok") {
+        statusEl.textContent = "Connected";
+        statusEl.className = "connection-status ok";
+        detailEl.textContent = "This device is using NextDNS.";
         return;
       }
 
-      if (d.status === "other") {
-        setConnectionState("error", d);
+      if (last.status === "other") {
+        statusEl.textContent = "Not using NextDNS";
+        statusEl.className = "connection-status error";
+        detailEl.textContent = last.provider
+          ? `Detected resolver: ${last.provider}.`
+          : "Another DNS resolver was detected.";
         return;
       }
 
-      await new Promise(resolve => setTimeout(resolve, 700));
+      await new Promise(r => setTimeout(r, 800));
     }
 
-    setConnectionState("error");
+    // Never claim the device is not using NextDNS when the checker simply
+    // could not obtain a result in time.
+    statusEl.textContent = "Unable to verify";
+    statusEl.className = "connection-status checking";
+    detailEl.textContent = "DNS checker did not return a result. Tap Check Again.";
   } catch (_) {
-    setConnectionState("error");
+    statusEl.textContent = "Unable to verify";
+    statusEl.className = "connection-status checking";
+    detailEl.textContent = "DNS checker could not be reached. Tap Check Again.";
+  } finally {
+    if (refreshEl) refreshEl.disabled = false;
   }
 }
 
