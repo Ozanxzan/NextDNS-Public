@@ -37,11 +37,12 @@ export async function onRequest(context) {
   try {
     // These are the critical requests. If status works, the dashboard is
     // considered healthy even when optional analytics/chart requests fail.
-    const [statusRangeRes, status24Res, encryptionRes, dnssecRes] = await Promise.all([
+    const [statusRangeRes, status24Res, encryptionRes, dnssecRes, reasonsRes] = await Promise.all([
       fetch(`${base}/status?from=${encodeURIComponent(cfg.from)}&limit=100`, { headers }),
       fetch(`${base}/status?from=-24h&limit=100`, { headers }),
       fetch(`${base}/encryption?from=${encodeURIComponent(cfg.from)}&limit=100`, { headers }),
-      fetch(`${base}/dnssec?from=${encodeURIComponent(cfg.from)}&limit=100`, { headers })
+      fetch(`${base}/dnssec?from=${encodeURIComponent(cfg.from)}&limit=100`, { headers }),
+      fetch(`${base}/reasons?from=${encodeURIComponent(cfg.from)}&limit=6`, { headers })
     ]);
 
     if (!statusRangeRes.ok) {
@@ -92,6 +93,8 @@ export async function onRequest(context) {
     }
 
     const dnssecJson = dnssecRes.ok ? await dnssecRes.json() : { data: [] };
+    const reasonsJson = reasonsRes.ok ? await reasonsRes.json() : { data: [] };
+    const reasons = Array.isArray(reasonsJson.data) ? reasonsJson.data.slice(0, 6) : [];
     const dnssecRows = Array.isArray(dnssecJson.data) ? dnssecJson.data : [];
     const dnssec = dnssecRows.some(x =>
       x.validated === true ||
@@ -153,6 +156,7 @@ export async function onRequest(context) {
       blocked24h,
       encrypted24h,
       dnssec24h,
+      reasons,
       series
     });
   } catch (_) {
