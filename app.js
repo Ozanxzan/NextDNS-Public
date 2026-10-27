@@ -1,6 +1,48 @@
 const $ = s => document.querySelector(s);
 const fmt = n => Number(n || 0).toLocaleString("en-US");
 function set(id, v) { const e = $("#" + id); if (e) e.textContent = v; }
+
+// Smoothly animate the real aggregate counters whenever fresh API data arrives.
+// The animation is presentation-only; the API values remain the source of truth.
+const counterValues = Object.create(null);
+const counterFrames = Object.create(null);
+function animateCounter(id, target) {
+  const el = $("#" + id);
+  const end = Number(target);
+  if (!el || !Number.isFinite(end)) return;
+
+  const currentText = el.textContent.replace(/,/g, "").trim();
+  const parsedCurrent = Number(currentText);
+  const start = Number.isFinite(counterValues[id])
+    ? counterValues[id]
+    : (Number.isFinite(parsedCurrent) ? parsedCurrent : end);
+
+  if (counterFrames[id]) cancelAnimationFrame(counterFrames[id]);
+  if (start === end) {
+    counterValues[id] = end;
+    el.textContent = fmt(end);
+    return;
+  }
+
+  const duration = 850;
+  const startedAt = performance.now();
+  const tick = now => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const value = Math.round(start + (end - start) * eased);
+    el.textContent = fmt(value);
+    if (progress < 1) {
+      counterFrames[id] = requestAnimationFrame(tick);
+    } else {
+      counterValues[id] = end;
+      el.textContent = fmt(end);
+      delete counterFrames[id];
+    }
+  };
+  counterValues[id] = start;
+  counterFrames[id] = requestAnimationFrame(tick);
+}
+
 function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
 
 const ranges = {
@@ -132,8 +174,8 @@ async function loadRange(rangeKey) {
     const q = Number.isFinite(Number(d.queries)) ? Number(d.queries) : Number(d.queries24h || 0);
     const b = Number.isFinite(Number(d.blocked)) ? Number(d.blocked) : Number(d.blocked24h || 0);
     const enc = Number.isFinite(Number(d.encrypted)) ? Number(d.encrypted) : Number(d.encrypted24h || 0);
-    set("queries", fmt(q));
-    set("blocked", fmt(b));
+    animateCounter("queries", q);
+    animateCounter("blocked", b);
     set("rate", pct(b, q) + "%");
     set("encrypted", pct(enc, q) + "%");
     set("filtering", b > 0 ? "ACTIVE" : "READY");
