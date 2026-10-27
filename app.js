@@ -208,4 +208,4 @@ $("#theme")?.addEventListener("click", () => {
 
 if (localStorage.theme === "light") document.body.classList.add("light");
 loadRange(selectedRange);
-setInterval(() => loadRange(selectedRange), 60000);
+setInterval(() => loadRange(selectedRange), 30000);
