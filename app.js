@@ -126,7 +126,7 @@ function escapeHtml(value) {
   return value.replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[ch]));
 }
 
-function renderSecurityFeatures(security) {
+function renderSecurityFeatures(security, available = true) {
   const box = $("#securityFeaturesList");
   if (!box) return;
 
@@ -135,21 +135,42 @@ function renderSecurityFeatures(security) {
     ["Threat Intelligence Feeds", cfg.threatIntelligenceFeeds],
     ["AI-Driven Threat Detection", cfg.aiThreatDetection],
     ["Google Safe Browsing", cfg.googleSafeBrowsing],
-    ["Cryptojacking Protection", cfg.cryptojacking],
+    ["Cryptocurrency Mining / Cryptojacking", cfg.cryptojacking],
     ["DNS Rebinding Protection", cfg.dnsRebinding],
-    ["IDN Homograph Attacks Protection", cfg.idnHomographs],
-    ["Typosquatting Protection", cfg.typosquatting],
+    ["DNS Payload Delivery", cfg.dnsPayloadDelivery],
+    ["Local Network Addresses", cfg.localNetworkAddresses],
+    ["Decentralized Web Gateways", cfg.decentralizedWebGateways],
+    ["High-Risk TLDs", cfg.highRiskTlds],
+    ["IDN Homograph Attacks Protection", cfg.idnHomographs, "ai"],
+    ["Typosquatting Protection", cfg.typosquatting, "ai"],
     ["Domain Generation Algorithms (DGA) Protection", cfg.dga],
-    ["Block Newly Registered Domains (NRDs)", cfg.nrd],
-    ["Block Dynamic DNS Hostnames", cfg.ddns],
-    ["Block Parked Domains", cfg.parking],
-    ["Block Child Sexual Abuse Material", cfg.csam],
-    ["Block Top-Level Domains (TLDs)", Array.isArray(cfg.tlds) && cfg.tlds.length > 0]
+    ["Newly Registered Domains (NRDs)", cfg.nrd],
+    ["Newly Active Domains", cfg.newlyActiveDomains],
+    ["Dynamic DNS Hostnames", cfg.ddns],
+    ["Parked Domains", cfg.parking],
+    ["Tunneling Endpoints", cfg.tunnelingEndpoints],
+    ["Residential Hosting", cfg.residentialHosting],
+    ["Untrusted Certificates", cfg.untrustedCertificates],
+    ["Free Hosting Domains", cfg.freeHostingDomains],
+    ["Child Sexual Abuse Material (CSAM)", cfg.csam],
+    ["Custom Top-Level Domains (TLDs)", Array.isArray(cfg.tlds) ? cfg.tlds.length > 0 : null]
   ];
 
-  box.innerHTML = features.map(([name, enabled]) => {
-    const active = enabled === true;
-    return `<div class="security-feature-row"><span class="security-feature-name">${escapeHtml(name)}</span><b class="security-feature-status${active ? "" : " off"}">${active ? "ACTIVE" : "OFF"}</b></div>`;
+  box.innerHTML = features.map(([name, enabled, dependency]) => {
+    let label = "NOT EXPOSED";
+    let state = " unknown";
+    if (!available) {
+      label = "UNAVAILABLE";
+    } else if (dependency === "ai") {
+      if (enabled === true || cfg.aiThreatDetection === true) {
+        label = enabled === true ? "ACTIVE" : "INCLUDED IN AI";
+        state = "";
+      }
+    } else if (typeof enabled === "boolean") {
+      label = enabled ? "ACTIVE" : "OFF";
+      state = enabled ? "" : " off";
+    }
+    return `<div class="security-feature-row"><span class="security-feature-name">${escapeHtml(name)}</span><b class="security-feature-status${state}">${label}</b></div>`;
   }).join("");
 }
 
@@ -181,7 +202,7 @@ async function loadRange(rangeKey) {
     set("filtering", b > 0 ? "ACTIVE" : "READY");
     set("encState", enc > 0 ? "ACTIVE" : "—");
     set("dnssec", d.dnssec ? "ACTIVE" : (d.dnssec24h ? "ACTIVE" : "—"));
-    renderSecurityFeatures(d.security || {});
+    renderSecurityFeatures(d.security || {}, d.securityAvailable !== false);
 
     set("networkState", "ONLINE");
     const updatedAt = new Date(d.generatedAt);
