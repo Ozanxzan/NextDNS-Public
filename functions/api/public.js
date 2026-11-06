@@ -95,23 +95,48 @@ export async function onRequest(context) {
 
     const dnssecJson = dnssecRes.ok ? await dnssecRes.json() : { data: [] };
     const reasonsJson = reasonsRes.ok ? await reasonsRes.json() : { data: [] };
-    const securityJson = securityRes.ok ? await securityRes.json() : { data: {} };
+    const securityJson = securityRes.ok ? await securityRes.json() : { data: null };
     const reasons = Array.isArray(reasonsJson.data) ? reasonsJson.data.slice(0, 6) : [];
-    const securityData = securityJson && securityJson.data && typeof securityJson.data === "object" ? securityJson.data : {};
+    const securityPayload = securityJson && securityJson.data && typeof securityJson.data === "object" ? securityJson.data : null;
+    const securityData = securityPayload && securityPayload.security && typeof securityPayload.security === "object"
+      ? securityPayload.security
+      : (securityPayload || {});
+    const readSecurityFlag = (...keys) => {
+      for (const key of keys) {
+        const value = securityData[key];
+        if (typeof value === "boolean") return value;
+        if (typeof value === "string" && /^(true|false)$/i.test(value)) return value.toLowerCase() === "true";
+        if (value && typeof value === "object" && typeof value.enabled === "boolean") return value.enabled;
+      }
+      return null;
+    };
+    const rawTlds = Array.isArray(securityData.tlds)
+      ? securityData.tlds
+      : (Array.isArray(securityData.blocked_tlds) ? securityData.blocked_tlds : null);
     const security = {
-      threatIntelligenceFeeds: securityData.threatIntelligenceFeeds === true,
-      aiThreatDetection: securityData.aiThreatDetection === true,
-      googleSafeBrowsing: securityData.googleSafeBrowsing === true,
-      cryptojacking: securityData.cryptojacking === true,
-      dnsRebinding: securityData.dnsRebinding === true,
-      idnHomographs: securityData.idnHomographs === true || securityData.homograph === true,
-      typosquatting: securityData.typosquatting === true,
-      dga: securityData.dga === true,
-      nrd: securityData.nrd === true,
-      ddns: securityData.ddns === true,
-      parking: securityData.parking === true || securityData.parked === true,
-      csam: securityData.csam === true,
-      tlds: Array.isArray(securityData.tlds) ? securityData.tlds : (Array.isArray(securityData.blocked_tlds) ? securityData.blocked_tlds : [])
+      threatIntelligenceFeeds: readSecurityFlag("threatIntelligenceFeeds", "threat_intelligence_feeds"),
+      aiThreatDetection: readSecurityFlag("aiThreatDetection", "ai_threat_detection"),
+      googleSafeBrowsing: readSecurityFlag("googleSafeBrowsing", "google_safe_browsing"),
+      cryptojacking: readSecurityFlag("cryptojacking", "cryptocurrencyMining", "blockCryptocurrencyMining", "cryptocurrency_mining"),
+      dnsRebinding: readSecurityFlag("dnsRebinding", "dns_rebinding"),
+      idnHomographs: readSecurityFlag("idnHomographs", "homograph", "idn_homographs"),
+      typosquatting: readSecurityFlag("typosquatting"),
+      dga: readSecurityFlag("dga"),
+      nrd: readSecurityFlag("nrd", "newlyRegisteredDomains", "blockNewlyRegisteredDomains"),
+      newlyActiveDomains: readSecurityFlag("newlyActiveDomains", "blockNewlyActiveDomains", "newly_active_domains"),
+      ddns: readSecurityFlag("ddns", "dynamicDnsHostnames", "blockDynamicDnsHostnames"),
+      parking: readSecurityFlag("parking", "parked", "parkedDomains", "blockParkedDomains"),
+      csam: readSecurityFlag("csam"),
+      decentralizedWebGateways: readSecurityFlag("decentralizedWebGateways", "blockDecentralizedWebGateways", "web3Gateways", "ipfsGateways"),
+      highRiskTlds: readSecurityFlag("highRiskTlds", "highRiskTLDs", "blockHighRiskTlds", "highRiskTopLevelDomains"),
+      dataDropServices: readSecurityFlag("dataDropServices", "blockDataDropServices", "data_drop_services"),
+      dnsPayloadDelivery: readSecurityFlag("dnsPayloadDelivery", "disruptDnsPayloadDelivery", "dns_payload_delivery"),
+      localNetworkAddresses: readSecurityFlag("localNetworkAddresses", "blockLocalNetworkAddresses", "local_network_addresses"),
+      tunnelingEndpoints: readSecurityFlag("tunnelingEndpoints", "blockTunnelingEndpoints", "tunneling_endpoints"),
+      residentialHosting: readSecurityFlag("residentialHosting", "blockResidentialHosting", "residential_hosting"),
+      untrustedCertificates: readSecurityFlag("untrustedCertificates", "blockUntrustedCertificates", "untrusted_certificates"),
+      freeHostingDomains: readSecurityFlag("freeHostingDomains", "blockFreeHostingDomains", "free_hosting_domains"),
+      tlds: rawTlds ? rawTlds.map(item => typeof item === "string" ? item : item && item.id).filter(Boolean) : null
     };
     const dnssecRows = Array.isArray(dnssecJson.data) ? dnssecJson.data : [];
     const dnssec = dnssecRows.some(x =>
@@ -183,6 +208,7 @@ export async function onRequest(context) {
       dnssec24h,
       reasons,
       security,
+      securityAvailable: securityRes.ok && Boolean(securityPayload),
       series
     });
   } catch (_) {
@@ -200,7 +226,7 @@ function json(data, status = 200) {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "public, max-age=60, s-maxage=60",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
       "X-Content-Type-Options": "nosniff"
     }
   });
